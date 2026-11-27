@@ -153,6 +153,10 @@
     const LIFF_ID = "2008093948-ScPDGuav";
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz30ZzXQSutihoiDzw7HiZuf1G6Sv1F5ZCtXWlHj9j7FDOLffpUhPK7adtBOOsMJ7hQ/exec";
 
+    function isValidHttpsUri(url) {
+      return typeof url === "string" && /^https:\/\//i.test(url.trim());
+    }
+
     function applyCommonStyle(el, node = {}) {
       if (!node) return;
       if (node.margin) el.style.marginTop = mapSpacing(node.margin);
@@ -163,7 +167,7 @@
         if (node.gravity === 'center') el.style.alignSelf = 'center';
         if (node.gravity === 'bottom') el.style.alignSelf = 'flex-end';
       }
-      if (node.action && node.action.type === 'uri') {
+      if (node.action && node.action.type === 'uri' && isValidHttpsUri(node.action.uri)) {
         el.style.cursor = 'pointer';
         el.addEventListener('click', () => window.open(node.action.uri, '_blank'));
       }
@@ -259,8 +263,9 @@
     }
 
     function appendShareButtonToContents(contents, shareUrl) {
-      if (!contents || !shareUrl) return contents;
+      if (!contents || !isValidHttpsUri(shareUrl)) return contents;
       const cloned = deepClone(contents);
+      const cleanUri = shareUrl.trim();
 
       const shareButton = {
         type: "button",
@@ -269,7 +274,7 @@
         action: {
           type: "uri",
           label: "แชร์ต่อ",
-          uri: shareUrl
+          uri: cleanUri
         }
       };
 
@@ -285,7 +290,7 @@
         } else if (bubble.footer.type === "box") {
           bubble.footer.contents = bubble.footer.contents || [];
           const alreadyExists = bubble.footer.contents.some(
-            item => item && item.type === "button" && item.action && item.action.uri === shareUrl
+            item => item && item.type === "button" && item.action && item.action.uri === cleanUri
           );
           if (!alreadyExists) {
             bubble.footer.contents.push(shareButton);
@@ -379,7 +384,7 @@
 
       const includeShare = document.getElementById('includeShareBtn')?.checked;
       const demoUrl = document.getElementById('demo')?.value.trim();
-      if (includeShare && demoUrl) {
+      if (includeShare && isValidHttpsUri(demoUrl)) {
         contents = appendShareButtonToContents(contents, demoUrl);
       }
 
@@ -449,323 +454,4 @@
           if (node.align) t.style.textAlign = node.align;
           if (node.wrap === true) t.style.whiteSpace = 'normal';
           else t.style.whiteSpace = 'nowrap';
-          if (node.decoration === 'underline') t.style.textDecoration = 'underline';
-          applyCommonStyle(t, node);
-          return t;
-        }
-
-        case 'image': {
-          const c = document.createElement('div');
-          if (isHero) c.className = 'flex-hero';
-          const img = document.createElement('img');
-          img.src = node.url;
-          img.loading = 'lazy';
-          img.style.width = '100%';
-          img.style.objectFit = objFit(node.aspectMode);
-          applyCommonStyle(img, node);
-          if (node.action && node.action.type === 'uri') {
-            img.style.cursor = 'pointer';
-            img.addEventListener('click', () => window.open(node.action.uri, '_blank'));
-          }
-          c.appendChild(img);
-          return c;
-        }
-
-        case 'button': {
-          const a = document.createElement('a');
-          const label = (node.action && node.action.label) ? node.action.label : (node.label || 'Button');
-          a.textContent = label;
-          a.href = (node.action && node.action.uri) ? node.action.uri : 'javascript:void(0)';
-          a.target = '_blank';
-          const style = (node.style || 'secondary').toLowerCase();
-          a.className = `btn-flex ${style === 'primary' ? 'primary' : (style === 'link' ? 'link' : '')}`;
-          applyCommonStyle(a, node);
-          return a;
-        }
-
-        case 'separator': {
-          const hr = document.createElement('div');
-          hr.className = 'sep';
-          applyCommonStyle(hr, node);
-          return hr;
-        }
-
-        case 'spacer': {
-          const sp = document.createElement('div');
-          const map = { xs:4, sm:6, md:8, lg:12, xl:16, xxl:20 };
-          sp.style.height = (map[node.size] || 8) + 'px';
-          return sp;
-        }
-
-        case 'filler': {
-          const f = document.createElement('div');
-          f.style.flex = '1 1 auto';
-          return f;
-        }
-
-        case 'icon': {
-          const i = document.createElement('img');
-          i.className = 'icon';
-          i.src = node.url;
-          return i;
-        }
-
-        default: {
-          const pre = document.createElement('pre');
-          pre.textContent = `[unsupported ${node.type}]`;
-          pre.style.fontSize = '12px';
-          pre.style.color = '#999';
-          return pre;
-        }
-      }
-    }
-
-    function buildFlexMessageFromTextarea(customShareUrl = null) {
-      const alt = document.getElementById("altText").value.trim() || "Flex Preview";
-      let parsed;
-
-      try {
-        parsed = getJsonFromTextarea();
-      } catch {
-        return "failed";
-      }
-
-      const converted = normalizeFlexContentsByMode(parsed);
-      if (!converted) return "failed";
-
-      const includeShare = document.getElementById('includeShareBtn')?.checked;
-      const shareUrl = customShareUrl || document.getElementById('demo')?.value.trim();
-      const finalContents = includeShare && shareUrl
-        ? appendShareButtonToContents(converted, shareUrl)
-        : converted;
-
-      if (parsed.type === 'flex' && parsed.contents) {
-        return {
-          ...parsed,
-          altText: alt,
-          contents: finalContents
-        };
-      }
-
-      return {
-        type: 'flex',
-        altText: alt,
-        contents: finalContents
-      };
-    }
-
-    function myFunction() {
-      return buildFlexMessageFromTextarea();
-    }
-
-    function saveShare() {
-      const lid = "lid" + Date.now();
-      const shareUrl = `https://liff.line.me/${LIFF_ID}/?flexid=${lid}`;
-      document.getElementById("demo").value = shareUrl;
-      document.getElementById("includeShareBtn").checked = true;
-
-      const msg = buildFlexMessageFromTextarea(shareUrl);
-      if (msg === "failed") {
-        alert("JSON ไม่ถูกต้อง");
-        return;
-      }
-
-      safePreview();
-
-      const sflex = JSON.stringify(msg.contents);
-      const code = window.btoa(unescape(encodeURIComponent(sflex)));
-
-      const xmlhttp = new XMLHttpRequest();
-      xmlhttp.open("POST", APPS_SCRIPT_URL);
-      xmlhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-      xmlhttp.send(JSON.stringify({
-        "lid": lid,
-        "desc": code,
-        "altText": msg.altText
-      }));
-
-      xmlhttp.onreadystatechange = function() {
-        if (this.readyState == 4 && this.status == 200) {
-          try {
-            const jsonResponse = JSON.parse(this.responseText);
-            alert("บันทึกแล้ว: " + (jsonResponse.desc || lid));
-          } catch {
-            alert("บันทึกเรียบร้อยแล้ว");
-          }
-        }
-      };
-    }
-
-    async function sendShare() {
-      let currentUrl = document.getElementById("demo").value.trim();
-      if (document.getElementById("includeShareBtn")?.checked && !currentUrl) {
-        const lid = "lid" + Date.now();
-        currentUrl = `https://liff.line.me/${LIFF_ID}/?flexid=${lid}`;
-        document.getElementById("demo").value = currentUrl;
-      }
-
-      const msg = buildFlexMessageFromTextarea(currentUrl);
-      if (msg === "failed") {
-        alert("JSON ไม่ถูกต้อง");
-        return;
-      }
-
-      try {
-        const result = await liff.shareTargetPicker([msg]);
-        if (result) alert("[" + result.status + "] Message sent!");
-        else alert("ShareTargetPicker ถูกยกเลิก");
-      } catch (e) {
-        console.error(e);
-        alert("แชร์ไม่สำเร็จ");
-      }
-    }
-
-    function copyUrl() {
-      const copyText = document.getElementById("demo");
-      copyText.select();
-      document.execCommand("copy");
-      alert("Copied URL: " + copyText.value);
-    }
-
-    function previewFlex() {
-      const preview = document.getElementById('previewArea');
-      try {
-        renderFlexTo(preview);
-      } catch (e) {
-        preview.innerHTML = `<p class="text-danger">${e.message}</p>`;
-      }
-    }
-
-    function safePreview() {
-      const preview = document.getElementById('previewArea');
-      try {
-        renderFlexTo(preview);
-      } catch (e) {
-        preview.innerHTML = `<p class="text-muted">พิมพ์/วาง JSON แล้วกด Preview</p>`;
-      }
-    }
-
-    function updateModeUI() {
-      const modeEl = document.getElementById('flexMode');
-      const countWrap = document.getElementById('carouselCountWrap');
-      const imagesWrap = document.getElementById('carouselImagesWrap');
-      const linksWrap = document.getElementById('carouselLinksWrap');
-
-      if (!modeEl || !countWrap || !imagesWrap || !linksWrap) return;
-
-      const isCarousel = modeEl.value === 'carousel';
-      countWrap.style.display = isCarousel ? 'block' : 'none';
-      imagesWrap.style.display = isCarousel ? 'block' : 'none';
-      linksWrap.style.display = isCarousel ? 'block' : 'none';
-    }
-
-    function bindEvents() {
-      let t = null;
-
-      document.getElementById('flexjson').addEventListener('input', () => {
-        clearTimeout(t);
-        t = setTimeout(safePreview, 300);
-      });
-
-      document.getElementById('flexMode').addEventListener('change', function() {
-        updateModeUI();
-        safePreview();
-      });
-
-      document.getElementById('carouselCount').addEventListener('input', function() {
-        if (getMode() === 'carousel') safePreview();
-      });
-
-      document.getElementById('carouselImages').addEventListener('input', function() {
-        if (getMode() === 'carousel') safePreview();
-      });
-
-      document.getElementById('carouselLinks').addEventListener('input', function() {
-        if (getMode() === 'carousel') safePreview();
-      });
-
-      document.getElementById('includeShareBtn').addEventListener('change', safePreview);
-      document.getElementById('demo').addEventListener('input', safePreview);
-    }
-
-    async function handleIncomingFlexId(flexid) {
-      const overlay = document.getElementById('shareForwardOverlay');
-      const statusEl = document.getElementById('shareForwardStatus');
-      overlay.style.display = 'flex';
-      statusEl.textContent = 'กำลังโหลดข้อมูล Flex เพื่อแชร์ต่อ...';
-
-      try {
-        const res = await fetch(`${APPS_SCRIPT_URL}?flexid=${encodeURIComponent(flexid)}`);
-        const data = await res.json();
-
-        if (!data || !data.desc) {
-          throw new Error('ไม่พบข้อมูล Flex');
-        }
-
-        const decodedJsonStr = decodeURIComponent(escape(window.atob(data.desc)));
-        const contents = JSON.parse(decodedJsonStr);
-
-        const flexMsg = {
-          type: 'flex',
-          altText: data.altText || 'แชร์ Flex Message',
-          contents: contents
-        };
-
-        if (!liff.isApiAvailable('shareTargetPicker')) {
-          throw new Error('อุปกรณ์นี้ไม่รองรับ Share Target Picker');
-        }
-
-        statusEl.textContent = 'กรุณาเลือกเพื่อนหรือกลุ่มที่ต้องการแชร์ต่อ';
-        const result = await liff.shareTargetPicker([flexMsg]);
-
-        if (result && result.status === 'ok') {
-          statusEl.textContent = 'แชร์ต่อสำเร็จแล้ว';
-          if (liff.isInClient()) {
-            setTimeout(() => liff.closeWindow(), 800);
-            return;
-          }
-        } else {
-          statusEl.textContent = 'ยกเลิกการแชร์';
-        }
-      } catch (err) {
-        console.error(err);
-        alert(err.message || 'ไม่สามารถโหลด Flex เพื่อแชร์ต่อได้');
-      } finally {
-        overlay.style.display = 'none';
-      }
-    }
-
-    async function main() {
-      updateModeUI();
-      bindEvents();
-      safePreview();
-
-      try {
-        await liff.init({ liffId: LIFF_ID });
-
-        if (!liff.isLoggedIn()) {
-          liff.login({ redirectUri: window.location.href });
-          return;
-        }
-
-        const params = new URLSearchParams(window.location.search);
-        const flexid = params.get('flexid');
-        if (flexid) {
-          await handleIncomingFlexId(flexid);
-          return;
-        }
-
-        updateModeUI();
-        safePreview();
-      } catch (e) {
-        console.error('LIFF init failed:', e);
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', main);
-  </script>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
-
+          if (node
