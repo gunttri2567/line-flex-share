@@ -439,19 +439,4 @@
 
       switch (node.type) {
         case 'box': {
-          const d = document.createElement('div');
-          d.className = `box ${node.layout || 'vertical'}`;
-          applyCommonStyle(d, node);
-          (node.contents || []).forEach(ch => d.appendChild(renderComponent(ch)));
-          return d;
-        }
-
-        case 'text': {
-          const t = document.createElement('div');
-          t.className = `text ${mapTextSize(node.size)}`;
-          t.textContent = node.text ?? '';
-          if (node.weight === 'bold') t.style.fontWeight = '700';
-          if (node.align) t.style.textAlign = node.align;
-          if (node.wrap === true) t.style.whiteSpace = 'normal';
-          else t.style.whiteSpace = 'nowrap';
-          if (node
+          const d =
