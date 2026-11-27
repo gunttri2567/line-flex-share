@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=0,viewport-fit=cover">
+  <title>CHATRI AYA</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding: 20px; }
+    #previewArea {
+      border: 1px solid #ddd;
+      border-radius: 16px;
+      padding: 12px;
+      background: #f5f7fb;
+      min-height: 420px;
+      max-width: 380px;
+      overflow: auto;
+    }
+    .flex-bubble {
+      background: #fff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+    .flex-hero img { width: 100%; display: block; }
+    .section { padding: 12px; }
+    .flex-footer { border-top: 1px solid #eee; }
+    .box { display: flex; gap: 8px; }
+    .box.vertical { flex-direction: column; }
+    .box.horizontal { flex-direction: row; align-items: center; }
+    .box.baseline { flex-direction: row; align-items: baseline; }
+    .text { word-break: break-word; line-height: 1.4; }
+    .t-xs{font-size:12px;} .t-sm{font-size:14px;} .t-md{font-size:16px;}
+    .t-lg{font-size:18px;} .t-xl{font-size:20px;} .t-xxl{font-size:22px;}
+    .btn-flex { display:inline-block; padding:10px 14px; border-radius:10px; text-decoration:none; border:1px solid #0d6efd; color:#0d6efd; }
+    .btn-flex.primary { background:#0d6efd; color:#fff; border-color:#0d6efd; }
+    .btn-flex.link { border: none; padding: 0; color:#0d6efd; }
+    .sep { border-top:1px solid #e5e7eb; margin:6px 0; }
+    .icon { width: 20px; height: 20px; display:inline-block; }
+    .help-note {
+      font-size: 12px;
+      color: #6c757d;
+      margin-top: 4px;
+      display: block;
+      line-height: 1.45;
+    }
+    #shareForwardOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.95);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div id="shareForwardOverlay">
+    <div>
+      <div class="spinner-border text-success mb-3" role="status"></div>
+      <h5 id="shareForwardStatus">กำลังเตรียม Flex Message เพื่อแชร์ต่อ...</h5>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <h4>Flex Form</h4>
+
+      <div class="mb-2">
+        <label for="flexjson" class="form-label">JSON</label>
+        <a href="https://developers.line.biz/flex-simulator" target="_blank" class="link-info ms-2">FLEX MESSAGE SIMULATOR</a>
+        <textarea class="form-control" id="flexjson" name="flexjson" rows="16">{
+  "type": "bubble",
+  "size": "giga",
+  "hero": {
+    "type": "image",
+    "url": "https://raw.githubusercontent.com/gunttri2567/triliff2025/refs/heads/branch/images/1035089.jpg",
+    "size": "full",
+    "aspectRatio": "1108:1478",
+    "aspectMode": "cover",
+    "action": {
+      "type": "uri",
+      "uri": "https://raw.githubusercontent.com/gunttri2567/triliff2025/refs/heads/branch/images/1035089.jpg"
+    }
+  }
+}</textarea>
+      </div>
+
+      <div class="mb-2">
+        <label for="altText" class="form-label">altText</label>
+        <input type="text" class="form-control" id="altText" placeholder="ข้อความสั้น ๆ ที่จะแสดงแทน Flex Message">
+      </div>
+
+      <div class="mb-2">
+        <label for="flexMode" class="form-label">โหมดการส่ง</label>
+        <select class="form-select" id="flexMode">
+          <option value="single" selected>แบบเดิม (Bubble)</option>
+          <option value="carousel">แบบ Carousel</option>
+        </select>
+      </div>
+
+      <div class="mb-2" id="carouselCountWrap" style="display:none;">
+        <label for="carouselCount" class="form-label">จำนวน Bubble ใน Carousel</label>
+        <input type="number" class="form-control" id="carouselCount" value="2" min="2" max="12">
+        <small class="help-note">ใช้เมื่อไม่ได้กรอก URL หลายรูปด้านล่าง ระบบจะ clone bubble เดิมตามจำนวนนี้</small>
+      </div>
+
+      <div class="mb-2" id="carouselImagesWrap" style="display:none;">
+        <label for="carouselImages" class="form-label">URL รูปภาพสำหรับ Carousel (1 บรรทัด = 1 รูป)</label>
+        <textarea class="form-control" id="carouselImages" rows="4" placeholder="https://example.com/1.jpg&#10;https://example.com/2.jpg"></textarea>
+        <small class="help-note">ถ้ากรอกหลายรูป ระบบจะสร้าง Bubble ตามจำนวนรูป และแทนที่ hero.url ของแต่ละ Bubble ให้อัตโนมัติ</small>
+      </div>
+
+      <div class="mb-2" id="carouselLinksWrap" style="display:none;">
+        <label for="carouselLinks" class="form-label">ลิงก์คลิกของแต่ละ Bubble (1 บรรทัด = 1 ลิงก์)</label>
+        <textarea class="form-control" id="carouselLinks" rows="4" placeholder="https://your-link.com/a&#10;https://your-link.com/b"></textarea>
+        <small class="help-note">ถ้าไม่กรอก ระบบจะใช้ URL รูปภาพของแต่ละ Bubble เป็นลิงก์คลิกแทน</small>
+      </div>
+
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="includeShareBtn" checked>
+        <label class="form-check-label" for="includeShareBtn">แนบปุ่ม "แชร์ต่อ" ใน Flex ให้ผู้รับแชร์ต่อได้</label>
+      </div>
+
+      <div class="input-group mb-3">
+        <input type="text" class="form-control" id="demo" placeholder="Ctrl+C > Copy liff url.">
+        <button class="btn btn-outline-secondary" type="button" id="btnCopy">Copy</button>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-success" id="btnSave">Save liff</button>
+        <button type="button" class="btn btn-success" id="btnSend">Share Target Picker</button>
+        <button type="button" class="btn btn-warning" id="btnPreview">Preview Flex</button>
+      </div>
+      <small class="text-muted d-block mt-2">* ปุ่ม Preview จะเรนเดอร์จาก JSON ที่อยู่ในช่อง textarea ตามโหมดที่เลือก</small>
+    </div>
+
+    <div class="col-md-6">
+      <h4>Preview</h4>
+      <div id="previewArea"><p class="text-muted">ยังไม่มี preview</p></div>
+    </div>
+  </div>
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script>
+    const LIFF_ID = "2008093948-ScPDGuav";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz30ZzXQSutihoiDzw7HiZuf1G6Sv1F5ZCtXWlHj9j7FDOLffpUhPK7adtBOOsMJ7hQ/exec";
+
+    function isValidHttpsUri(url) {
+      return typeof url === "string" && /^https:\/\//i.test(url.trim());
+    }
+
+    function deepClone(obj) {
+      return JSON.parse(JSON.stringify(obj));
+    }
+
+    function mapTextSize(size) {
+      const m = { xs:"t-xs", sm:"t-sm", md:"t-md", lg:"t-lg", xl:"t-xl", xxl:"t-xxl" };
+      return m[size] || "t-md";
+    }
+
+    function mapSpacing(sp) {
+      const m = { none:"0px", xs:"4px", sm:"6px", md:"8px", lg:"12px", xl:"16px", xxl:"20px" };
+      return m[sp] || "8px";
+    }
+
+    function objFit(mode) {
+      return mode === "contain" ? "contain" : "cover";
+    }
+
+    function applyCommonStyle(el, node) {
+      if (!node) return;
+      if (node.margin) el.style.marginTop = mapSpacing(node.margin);
+      if (node.backgroundColor) el.style.backgroundColor = node.backgroundColor;
+      if (node.color) el.style.color = node.color;
+      if (node.align) el.style.textAlign = node.align;
+      if (node.gravity === "center") el.style.alignSelf = "center";
+      if (node.gravity === "bottom") el.style.alignSelf = "flex-end";
+      if (node.action && node.action.type === "uri" && isValidHttpsUri(node.action.uri)) {
+        el.style.cursor = "pointer";
+        el.addEventListener("click", () => window.open(node.action.uri, "_blank"));
+      }
+    }
+
+    function getMode() {
+      return document.getElementById("flexMode").value || "single";
+    }
+
+    function getCarouselCount() {
+      const n = parseInt(document.getElementById("carouselCount").value || "2", 10);
+      return isNaN(n) ? 2 : Math.max(2, Math.min(12, n));
+    }
+
+    function getLines(id) {
+      return (document.getElementById(id).value || "")
+        .split("\n")
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+
+    function getJsonFromTextarea() {
+      return JSON.parse(document.getElementById("flexjson").value.trim());
+    }
+
+    function appendShareButtonToContents(contents, shareUrl) {
+      if (!contents || !isValidHttpsUri(shareUrl)) return contents;
+      const cloned = deepClone(contents);
+      const cleanUri = shareUrl.trim();
+      const shareButton = {
+        type: "button",
+        style: "primary",
+        height: "sm",
+        action: { type: "uri", label: "แชร์ต่อ", uri: cleanUri }
+      };
+
+      function addBtn(bubble) {
+        if (!bubble || bubble.type !== "bubble") return;
+        if (!bubble.footer) {
+          bubble.footer = { type: "box", layout: "vertical", spacing: "sm", contents: [shareButton] };
+        } else if (bubble.footer.type === "box") {
+          bubble.footer.contents = bubble.footer.contents || [];
+          const exists = bubble.footer.contents.some(x => x && x.type === "button" && x.action && x.action.uri === cleanUri);
+          if (!exists) bubble.footer.contents.push(shareButton);
+        } else {
+          bubble.footer = { type: "box", layout: "vertical", spacing: "sm", contents: [bubble.footer, shareButton] };
+        }
+      }
+
+      if (cloned.type === "bubble") addBtn(cloned);
+      else if (cloned.type === "carousel" && Array.isArray(cloned.contents)) cloned.contents.forEach(addBtn);
+      return cloned;
+    }
+
+    function normalizeFlexContentsByMode(json) {
+      const mode = getMode();
+      let base = deepClone(json);
+      if (base.type === "flex" && base.contents) base = base.contents;
+
+      if (mode === "single") {
+        if (base.type === "carousel") return (base.contents && base.contents.length) ? base.contents[0] : null;
+        return base.type === "bubble" ? base : null;
+      }
+
+      if (mode === "carousel") {
+        if (base.type === "carousel") return base;
+        if (base.type === "bubble") {
+          const imgs = getLines("carouselImages");
+          const links = getLines("carouselLinks");
+          const count = getCarouselCount();
+          const arr = [];
+
+          if (imgs.length > 0) {
+            imgs.slice(0, 12).forEach((img, idx) => {
+              const b = deepClone(base);
+              b.hero = b.hero || { type: "image", size: "full", aspectRatio: "1:1", aspectMode: "cover" };
+              b.hero.type = "image";
+              b.hero.url = img;
+              b.hero.action = { type: "uri", uri: links[idx] || img };
+              arr.push(b);
+            });
+          } else {
+            for (let i = 0; i < count; i++) {
+              const b = deepClone(base);
+              if (b.hero && b.hero.type === "image" && links[i]) {
+                b.hero.action = { type: "uri", uri: links[i] };
+              }
+              arr.push(b);
+            }
+          }
+          return { type: "carousel", contents: arr };
+        }
+      }
+      return null;
+    }
+
+    function buildFlexMessageFromTextarea(customShareUrl) {
+      const alt = document.getElementById("altText").value.trim() || "Flex Preview";
+      let parsed;
+      try {
+        parsed = getJsonFromTextarea();
+      } catch {
+        return "failed";
+      }
+      const converted = normalizeFlexContentsByMode(parsed);
+      if (!converted) return "failed";
+
+      const includeShare = document.getElementById("includeShareBtn").checked;
+      const shareUrl = customShareUrl || document.getElementById("demo").value.trim();
+      const finalContents = (includeShare && isValidHttpsUri(shareUrl))
+        ? appendShareButtonToContents(converted, shareUrl)
+        : converted;
+
+      return { type: "flex", altText: alt, contents: finalContents };
+    }
+
+    function renderComponent(node, isHero) {
+      if (!node) return document.createDocumentFragment();
+      switch (node.type) {
+        case "box": {
+          const d = document.createElement("div");
+          d.className = "box " + (node.layout || "vertical");
+          applyCommonStyle(d, node);
+          (node.contents || []).forEach(ch => d.appendChild(renderComponent(ch, false)));
+          return d;
+        }
+        case "text": {
+          const t = document.createElement("div");
+          t.className = "text " + mapTextSize(node.size);
+          t.textContent = node.text != null ? node.text : "";
+          if (node.weight === "bold") t.style.fontWeight = "700";
+          if (node.wrap === true) t.style.whiteSpace = "normal";
+          else t.style.whiteSpace = "nowrap";
+          if (node.decoration === "underline") t.style.textDecoration = "underline";
+          applyCommonStyle(t, node);
+          return t;
+        }
+        case "image": {
+          const c = document.createElement("div");
+          if (isHero) c.className = "flex-hero";
+          const img = document.createElement("img");
+          img.src = node.url || "";
+          img.loading = "lazy";
+          img.style.width = "100%";
+          img.style.objectFit = objFit(node.aspectMode);
+          applyCommonStyle(img, node);
+          c.appendChild(img);
+          return c;
+        }
+        case "button": {
+          const a = document.createElement("a");
+          a.textContent = (node.action && node.action.label) ? node.action.label : (node.label || "Button");
+          a.href = (node.action && node.action.uri) ? node.action.uri : "javascript:void(0)";
+          a.target = "_blank";
+          const st = (node.style || "secondary").toLowerCase();
+          a.className = "btn-flex " + (st === "primary" ? "primary" : (st === "link" ? "link" : ""));
+          applyCommonStyle(a, node);
+          return a;
+        }
+        case "separator": {
+          const hr = document.createElement("div");
+          hr.className = "sep";
+          applyCommonStyle(hr, node);
+          return hr;
+        }
+        case "spacer": {
+          const sp = document.createElement("div");
+          const map = { xs:4, sm:6, md:8, lg:12, xl:16, xxl:20 };
+          sp.style.height = (map[node.size] || 8) + "px";
+          return sp;
+        }
+        case "filler": {
+          const f = document.createElement("div");
+          f.style.flex = "1 1 auto";
+          return f;
+        }
+        case "icon": {
+          const i = document.createElement("img");
+          i.className = "icon";
+          i.src = node.url || "";
+          return i;
+        }
+        default: {
+          const pre = document.createElement("pre");
+          pre.textContent = "[unsupported " + node.type + "]";
+          pre.style.fontSize = "12px";
+          pre.style.color = "#999";
+          return pre;
+        }
+      }
+    }
+
+    function renderBubble(bubble) {
+      const wrap = document.createElement("div");
+      wrap.className = "flex-bubble";
+      if (bubble.hero) wrap.appendChild(renderComponent(bubble.hero, true));
+      if (bubble.header) {
+        const sec = document.createElement("div");
+        sec.className = "section";
+        sec.appendChild(renderComponent(bubble.header, false));
+        wrap.appendChild(sec);
+      }
+      if (bubble.body) {
+        const sec = document.createElement("div");
+        sec.className = "section";
+        sec.appendChild(renderComponent(bubble.body, false));
+        wrap.appendChild(sec);
+      }
+      if (bubble.footer) {
+        const sec = document.createElement("div");
+        sec.className = "section flex-footer";
+        sec.appendChild(renderComponent(bubble.footer, false));
+        wrap.appendChild(sec);
+      }
+      return wrap;
+    }
+
+    function renderPreview(showError) {
+      const preview = document.getElementById("previewArea");
+      try {
+        const msg = buildFlexMessageFromTextarea(document.getElementById("demo").value.trim() || null);
+        if (msg === "failed") throw new Error("รองรับเฉพาะ bubble / carousel หรือ message.type=\"flex\"");
+        preview.innerHTML = "";
+        const c = msg.contents;
+        if (c.type === "carousel") {
+          (c.contents || []).forEach(b => preview.appendChild(renderBubble(b)));
+        } else {
+          preview.appendChild(renderBubble(c));
+        }
+      } catch (err) {
+        preview.innerHTML = showError
+          ? "<p class=\"text-danger\">" + (err.message || "JSON ไม่ถูกต้อง") + "</p>"
+          : "<p class=\"text-muted\">พิมพ์/วาง JSON แล้วกด Preview</p>";
+      }
+    }
+
+    async function postToSheet(payload) {
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=UTF-8" },
+        body: JSON.stringify(payload)
+      });
+      return res.json();
+    }
+
+    async function saveShare() {
+      const lid = "lid" + Date.now();
+      const shareUrl = "https://liff.line.me/" + LIFF_ID + "/?flexid=" + lid;
+      document.getElementById("demo").value = shareUrl;
+      document.getElementById("includeShareBtn").checked = true;
+
+      const msg = buildFlexMessageFromTextarea(shareUrl);
+      if (msg === "failed") {
+        alert("JSON ไม่ถูกต้อง");
+        return null;
+      }
+      renderPreview(true);
+
+      const sflex = JSON.stringify(msg.contents);
+      const code = window.btoa(unescape(encodeURIComponent(sflex)));
+      const payload = {
+        lid: lid,
+        desc: code,
+        alt: msg.altText,
+        mode: getMode(),
+        flexType: (msg.contents && msg.contents.type) || ""
+      };
+
+      try {
+        const jsonResponse = await postToSheet(payload);
+        alert("บันทึกแล้ว: " + (jsonResponse.lid || jsonResponse.desc || lid));
+        return msg;
+      } catch (err) {
+        console.error(err);
+        alert("บันทึกไม่สำเร็จ: " + (err.message || err));
+        return null;
+      }
+    }
+
+    async function sendShare() {
+      let currentUrl = document.getElementById("demo").value.trim();
+      let msg;
+      if (document.getElementById("includeShareBtn").checked && !isValidHttpsUri(currentUrl)) {
+        msg = await saveShare();
+      } else {
+        msg = buildFlexMessageFromTextarea(currentUrl || null);
+      }
+      if (!msg || msg === "failed") {
+        alert("JSON ไม่ถูกต้อง");
+        return;
+      }
+      try {
+        const result = await liff.shareTargetPicker([msg]);
+        if (result) alert("[" + result.status + "] Message sent!");
+        else alert("ShareTargetPicker ถูกยกเลิก");
+      } catch (e) {
+        console.error(e);
+        alert("แชร์ไม่สำเร็จ: " + (e.message || e));
+      }
+    }
+
+    function copyUrl() {
+      const el = document.getElementById("demo");
+      el.select();
+      document.execCommand("copy");
+      alert("Copied URL: " + el.value);
+    }
+
+    function updateModeUI() {
+      const isCarousel = document.getElementById("flexMode").value === "carousel";
+      document.getElementById("carouselCountWrap").style.display = isCarousel ? "block" : "none";
+      document.getElementById("carouselImagesWrap").style.display = isCarousel ? "block" : "none";
+      document.getElementById("carouselLinksWrap").style.display = isCarousel ? "block" : "none";
+    }
+
+    async function handleIncomingFlexId(flexid) {
+      const overlay = document.getElementById("shareForwardOverlay");
+      const statusEl = document.getElementById("shareForwardStatus");
+      overlay.style.display = "flex";
+      statusEl.textContent = "กำลังโหลดข้อมูล Flex เพื่อแชร์ต่อ...";
+
+      try {
+        const res = await fetch(APPS_SCRIPT_URL + "?flexid=" + encodeURIComponent(flexid));
+        const data = await res.json();
+        if (!data || data.error || !data.desc) {
+          throw new Error((data && data.error) || "ไม่พบข้อมูล Flex");
+        }
+        const decodedJsonStr = decodeURIComponent(escape(window.atob(data.desc)));
+        const contents = JSON.parse(decodedJsonStr);
+        const flexMsg = {
+          type: "flex",
+          altText: data.alt || "แชร์ Flex Message",
+          contents: contents
+        };
+
+        if (!liff.isApiAvailable("shareTargetPicker")) {
+          throw new Error("อุปกรณ์นี้ไม่รองรับ Share Target Picker");
+        }
+        statusEl.textContent = "กรุณาเลือกเพื่อนหรือกลุ่มที่ต้องการแชร์ต่อ";
+        const result = await liff.shareTargetPicker([flexMsg]);
+        if (result && result.status === "ok") {
+          statusEl.textContent = "แชร์ต่อสำเร็จแล้ว";
+          if (liff.isInClient()) {
+            setTimeout(() => liff.closeWindow(), 800);
+            return;
+          }
+        } else {
+          statusEl.textContent = "ยกเลิกการแชร์";
+        }
+      } catch (err) {
+        console.error(err);
+        alert(err.message || "ไม่สามารถโหลด Flex เพื่อแชร์ต่อได้");
+      } finally {
+        overlay.style.display = "none";
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      updateModeUI();
+      renderPreview(false);
+
+      document.getElementById("btnSave").addEventListener("click", saveShare);
+      document.getElementById("btnSend").addEventListener("click", sendShare);
+      document.getElementById("btnPreview").addEventListener("click", () => renderPreview(true));
+      document.getElementById("btnCopy").addEventListener("click", copyUrl);
+      document.getElementById("flexMode").addEventListener("change", () => {
+        updateModeUI();
+        renderPreview(false);
+      });
+      ["flexjson", "carouselCount", "carouselImages", "carouselLinks", "includeShareBtn", "demo"].forEach(id => {
+        document.getElementById(id).addEventListener("input", () => renderPreview(false));
+      });
+
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        const params = new URLSearchParams(window.location.search);
+        const flexid = params.get("flexid");
+        if (!liff.isLoggedIn() && (liff.isInClient() || flexid)) {
+          liff.login({ redirectUri: window.location.href });
+          return;
+        }
+        if (flexid) {
+          await handleIncomingFlexId(flexid);
+        }
+      } catch (e) {
+        console.error("LIFF init failed:", e);
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
