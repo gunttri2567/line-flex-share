@@ -151,7 +151,11 @@
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script>
     const LIFF_ID = "2008093948-ScPDGuav";
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyMW_ZZerDrM7kPvK5HVtr1yuUFL1i1xEEn5SLhCCetDPWwd0hCOTWd1sF3y8rfQcVZGw/exec";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwktB_ZSm_VDDImG85Q4abmjDcBGHQqusr4PMsoWlT1d9fsADr6NaaM81uBnqq4exVL/exec";
+
+    function isValidHttpsUri(url) {
+      return typeof url === "string" && /^https:\/\//i.test(url.trim());
+    }
 
     function applyCommonStyle(el, node = {}) {
       if (!node) return;
@@ -163,7 +167,7 @@
         if (node.gravity === 'center') el.style.alignSelf = 'center';
         if (node.gravity === 'bottom') el.style.alignSelf = 'flex-end';
       }
-      if (node.action && node.action.type === 'uri') {
+      if (node.action && node.action.type === 'uri' && isValidHttpsUri(node.action.uri)) {
         el.style.cursor = 'pointer';
         el.addEventListener('click', () => window.open(node.action.uri, '_blank'));
       }
@@ -259,7 +263,7 @@
     }
 
     function appendShareButtonToContents(contents, shareUrl) {
-      if (!contents || !shareUrl) return contents;
+      if (!contents || !isValidHttpsUri(shareUrl)) return contents;
       const cloned = deepClone(contents);
 
       const shareButton = {
@@ -269,7 +273,7 @@
         action: {
           type: "uri",
           label: "แชร์ต่อ",
-          uri: shareUrl
+          uri: shareUrl.trim()
         }
       };
 
@@ -285,7 +289,7 @@
         } else if (bubble.footer.type === "box") {
           bubble.footer.contents = bubble.footer.contents || [];
           const alreadyExists = bubble.footer.contents.some(
-            item => item && item.type === "button" && item.action && item.action.uri === shareUrl
+            item => item && item.type === "button" && item.action && item.action.uri === shareUrl.trim()
           );
           if (!alreadyExists) {
             bubble.footer.contents.push(shareButton);
@@ -379,7 +383,7 @@
 
       const includeShare = document.getElementById('includeShareBtn')?.checked;
       const demoUrl = document.getElementById('demo')?.value.trim();
-      if (includeShare && demoUrl) {
+      if (includeShare && isValidHttpsUri(demoUrl)) {
         contents = appendShareButtonToContents(contents, demoUrl);
       }
 
@@ -463,7 +467,7 @@
           img.style.width = '100%';
           img.style.objectFit = objFit(node.aspectMode);
           applyCommonStyle(img, node);
-          if (node.action && node.action.type === 'uri') {
+          if (node.action && node.action.type === 'uri' && isValidHttpsUri(node.action.uri)) {
             img.style.cursor = 'pointer';
             img.addEventListener('click', () => window.open(node.action.uri, '_blank'));
           }
@@ -535,17 +539,9 @@
 
       const includeShare = document.getElementById('includeShareBtn')?.checked;
       const shareUrl = customShareUrl || document.getElementById('demo')?.value.trim();
-      const finalContents = includeShare && shareUrl
+      const finalContents = includeShare && isValidHttpsUri(shareUrl)
         ? appendShareButtonToContents(converted, shareUrl)
         : converted;
-
-      if (parsed.type === 'flex' && parsed.contents) {
-        return {
-          ...parsed,
-          altText: alt,
-          contents: finalContents
-        };
-      }
 
       return {
         type: 'flex',
@@ -574,23 +570,32 @@
 
       const sflex = JSON.stringify(msg.contents);
       const code = window.btoa(unescape(encodeURIComponent(sflex)));
+      const mode = getMode();
+      const flexType = msg.contents?.type || "";
 
       const xmlhttp = new XMLHttpRequest();
       xmlhttp.open("POST", APPS_SCRIPT_URL);
-      xmlhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+      xmlhttp.setRequestHeader("Content-Type", "text/plain;charset=UTF-8");
       xmlhttp.send(JSON.stringify({
         "lid": lid,
         "desc": code,
-        "altText": msg.altText
+        "alt": msg.altText,
+        "altText": msg.altText,
+        "mode": mode,
+        "flexType": flexType
       }));
 
       xmlhttp.onreadystatechange = function() {
-        if (this.readyState == 4 && this.status == 200) {
-          try {
-            const jsonResponse = JSON.parse(this.responseText);
-            alert("บันทึกแล้ว: " + (jsonResponse.desc || lid));
-          } catch {
-            alert("บันทึกเรียบร้อยแล้ว");
+        if (this.readyState == 4) {
+          if (this.status == 200) {
+            try {
+              const jsonResponse = JSON.parse(this.responseText);
+              alert("บันทึกแล้ว: " + (jsonResponse.desc || lid));
+            } catch {
+              alert("บันทึกเรียบร้อยแล้ว");
+            }
+          } else {
+            alert("บันทึกไม่สำเร็จ (HTTP " + this.status + ")");
           }
         }
       };
@@ -598,7 +603,7 @@
 
     async function sendShare() {
       let currentUrl = document.getElementById("demo").value.trim();
-      if (document.getElementById("includeShareBtn")?.checked && !currentUrl) {
+      if (document.getElementById("includeShareBtn")?.checked && !isValidHttpsUri(currentUrl)) {
         const lid = "lid" + Date.now();
         currentUrl = `https://liff.line.me/${LIFF_ID}/?flexid=${lid}`;
         document.getElementById("demo").value = currentUrl;
@@ -611,12 +616,13 @@
       }
 
       try {
+        console.log("Sending Flex:", JSON.stringify(msg));
         const result = await liff.shareTargetPicker([msg]);
         if (result) alert("[" + result.status + "] Message sent!");
         else alert("ShareTargetPicker ถูกยกเลิก");
       } catch (e) {
-        console.error(e);
-        alert("แชร์ไม่สำเร็จ");
+        console.error("shareTargetPicker error:", e);
+        alert("แชร์ไม่สำเร็จ: " + (e.message || e));
       }
     }
 
@@ -698,8 +704,8 @@
         const res = await fetch(`${APPS_SCRIPT_URL}?flexid=${encodeURIComponent(flexid)}`);
         const data = await res.json();
 
-        if (!data || !data.desc) {
-          throw new Error('ไม่พบข้อมูล Flex');
+        if (!data || data.error || !data.desc) {
+          throw new Error(data?.error || 'ไม่พบข้อมูล Flex');
         }
 
         const decodedJsonStr = decodeURIComponent(escape(window.atob(data.desc)));
@@ -707,7 +713,7 @@
 
         const flexMsg = {
           type: 'flex',
-          altText: data.altText || 'แชร์ Flex Message',
+          altText: data.alt || data.altText || 'แชร์ Flex Message',
           contents: contents
         };
 
@@ -744,7 +750,7 @@
         await liff.init({ liffId: LIFF_ID });
 
         if (!liff.isLoggedIn()) {
-          liff.login({ redirectUri: window.location.href });
+          liff.login();
           return;
         }
 
@@ -759,6 +765,7 @@
         safePreview();
       } catch (e) {
         console.error('LIFF init failed:', e);
+        alert('LIFF init failed: ' + (e.message || e));
       }
     }
 
